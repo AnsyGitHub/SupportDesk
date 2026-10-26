@@ -19,7 +19,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddSupportDesk(builder.Configuration.GetConnectionString("SupportDesk"), builder.Configuration["AI:Provider"],
-    builder.Configuration["AI:Model"], builder.Configuration["AI:ApiKey"]);
+    builder.Configuration["AI:Model"], builder.Configuration["AI:ApiKey"],
+    builder.Configuration.GetValue<int?>("AI:TimeoutSeconds") ?? 30, builder.Configuration["AI:ThinkingLevel"]);
 
 var app = builder.Build();
 

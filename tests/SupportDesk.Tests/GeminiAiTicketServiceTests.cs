@@ -36,6 +36,7 @@ public class GeminiAiTicketServiceTests
             Assert.Equal("synthetic-key", Assert.Single(request.Headers.GetValues("x-goog-api-key")));
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
             Assert.Equal("application/json", body.RootElement.GetProperty("generationConfig").GetProperty("responseMimeType").GetString());
+            Assert.Equal("low", body.RootElement.GetProperty("generationConfig").GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString());
             Assert.Contains("Synthetic title", body.RootElement.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString());
             return JsonResponse("""{"text":"  Please try resetting your password.  "}""");
         }));
@@ -44,7 +45,7 @@ public class GeminiAiTicketServiceTests
         var options = new DbContextOptionsBuilder<SupportDeskDbContext>().UseSqlite(connection).Options;
         await using var db = new SupportDeskDbContext(options);
         await db.Database.EnsureCreatedAsync();
-        var service = new TicketService(db, new GeminiAiTicketService(client, "test-model", "synthetic-key"));
+        var service = new TicketService(db, new GeminiAiTicketService(client, "test-model", "synthetic-key", thinkingLevel: "low"));
         var before = await service.CreateAsync(new("Synthetic title", "Synthetic description"));
 
         Assert.Equal(new TicketDraftReplyResponse("Please try resetting your password."), await service.DraftReplyAsync(before.Id));
@@ -133,14 +134,15 @@ public class GeminiAiTicketServiceTests
     }
 
     [Fact]
-    public async Task ProviderDeadlineBoundsResponseBodyReadAsync()
+    public async Task ConfiguredProviderDeadlineBoundsResponseBodyReadAsync()
     {
         using var client = new HttpClient(new ProviderHandler((_, _) => Task.FromResult(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) })))
         { Timeout = Timeout.InfiniteTimeSpan };
-        IAiTicketService service = new GeminiAiTicketService(client, "test-model", "synthetic-key");
+        IAiTicketService service = new GeminiAiTicketService(client, "test-model", "synthetic-key",
+            requestTimeout: TimeSpan.FromMilliseconds(50));
         var error = await Assert.ThrowsAsync<AiProviderException>(() =>
-            service.DraftReplyAsync("Title", "Description").WaitAsync(TimeSpan.FromSeconds(35)));
+            service.DraftReplyAsync("Title", "Description").WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.True(error.IsTimeout);
     }
 

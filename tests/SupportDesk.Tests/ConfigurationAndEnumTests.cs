@@ -45,6 +45,16 @@ public class ConfigurationAndEnumTests
         AssertEnumContract(TicketSentiment.Negative);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(301)]
+    public void RejectsUnboundedGeminiTimeouts(int seconds)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => new ServiceCollection()
+            .AddSupportDesk("Data Source=/tmp/tickets.db", "Gemini", aiTimeoutSeconds: seconds));
+        Assert.Equal("AI:TimeoutSeconds must be between 1 and 300.", error.Message);
+    }
+
     private static void AssertEnumContract<TEnum>(TEnum value) where TEnum : struct, Enum
     {
         var json = $"\"{value}\"";

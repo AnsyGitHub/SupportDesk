@@ -39,9 +39,16 @@ For Gemini, set these in each terminal before starting the API or MCP host:
 
 ```bash
 export AI__Provider=Gemini
-export AI__Model=your-structured-output-model
+export AI__Model=gemini-3.5-flash-lite
+export AI__TimeoutSeconds=60
 read -rsp 'Gemini API key: ' AI__ApiKey; echo
 export AI__ApiKey
+```
+
+If you keep these values in a local `.env`, load it before starting either host:
+
+```bash
+set -a; source .env; set +a
 ```
 
 Choose an available model supporting GenerateContent structured JSON output.
@@ -52,10 +59,16 @@ client's private `env` configuration; the launched process may not inherit your
 terminal environment. Keep its key outside this repository. Empty model/key
 configuration produces controlled AI failures while Ticket operations still work.
 
-Gemini uses plain HttpClient with a 30-second deadline covering the request and
-response body, no automatic retries, no redirects, and no fallback. The key is
+Gemini uses plain HttpClient with one deadline covering the request and response
+body. `AI__TimeoutSeconds` defaults to 30 and accepts 1–300 seconds; set 180 when
+the provider needs more time. `AI__ThinkingLevel=low` lowers reasoning effort for
+Gemini 3.x models, including `gemini-3.8-flash`. Omit ThinkingLevel for models
+without that setting; omission uses the provider default. Both hosts read these
+settings. There are no automatic retries, redirects, or fallback. The key is
 sent in the `x-goog-api-key` header. Structured JSON is parsed into typed output,
 then the shared Core validation runs before returning or saving results.
+Set REST/MCP client request timeouts above the provider deadline (for example,
+190 seconds for a 180-second provider deadline) so clients do not cancel early.
 Timeouts return REST 504, provider/malformed-output failures return 502, and MCP
 returns controlled tool errors. Caller cancellation stays cancellation. Analysis
 failures preserve stored data; Draft Replies are never saved or sent.
