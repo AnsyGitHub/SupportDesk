@@ -7,7 +7,7 @@ namespace SupportDesk.Core.Data;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddSupportDesk(this IServiceCollection services, string? connectionString)
+    public static IServiceCollection AddSupportDesk(this IServiceCollection services, string? connectionString, string? aiProvider = null)
     {
         const string message = "Set ConnectionStrings__SupportDesk to a SQLite connection string with an absolute database file path.";
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -31,6 +31,11 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddDbContext<SupportDeskDbContext>(options => options.UseSqlite(connection.ConnectionString));
+        if (string.Equals(aiProvider, "Mock", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IAiTicketService, MockAiTicketService>();
+        }
+
         services.AddScoped<TicketService>();
         return services;
     }

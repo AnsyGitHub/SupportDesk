@@ -72,6 +72,20 @@ public class Tools(TicketService tickets)
         }
     }
 
+    [McpServerTool(Name = "analyze_ticket", UseStructuredContent = true)]
+    [Description("Analyze a Ticket and save validated suggestions, replacing its Priority. AI__Provider=Mock returns labeled mock output. Works for Resolved and Closed Tickets.")]
+    public async Task<TicketAnalysisResponse> AnalyzeTicketAsync(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await tickets.AnalyzeAsync(id, cancellationToken);
+        }
+        catch (Exception exception) when (exception is NotFoundException or AiProviderException)
+        {
+            throw new McpException(exception.Message);
+        }
+    }
+
     [McpServerTool(Name = "get_ticket", UseStructuredContent = true, ReadOnly = true)]
     [Description("Retrieve a Ticket by its integer ID. Returns an error if it does not exist.")]
     public async Task<TicketResponse> GetTicketAsync(int id, CancellationToken cancellationToken)

@@ -3,7 +3,8 @@
 A .NET 10 support-ticket application with a controller API and a separate stdio
 MCP host over the same Core service and SQLite database. Currently implemented:
 create, retrieve, list, and update Tickets, status changes, and dashboard counts.
-Later tickets add AI operations. No AI credentials are needed for the current operations.
+Analysis uses explicitly selected mock AI. Gemini and Draft Replies are pending.
+No AI credentials are needed for the mock demonstration.
 
 ## Prerequisites and setup
 
@@ -22,11 +23,19 @@ path** for both hosts:
 
 ```bash
 export ConnectionStrings__SupportDesk="Data Source=$PWD/supportdesk.db"
+export AI__Provider=Mock
 ```
 
 The hosts reject missing or relative database paths and in-memory databases.
 `.env.example` contains placeholders; .NET does not automatically load `.env`
 files. Database files and local `.env` files are ignored by Git.
+
+Set `AI__Provider=Mock` for each host to enable the deterministic mock provider.
+Its Summary and SuggestedAction explicitly say Mock; it does not contact an AI
+provider and does not infer real suggestions from Ticket text. Missing or
+unsupported provider selection disables Analysis with a controlled provider error;
+ordinary Ticket operations still work. There is no automatic fallback to Mock.
+`AI__Model` and `AI__ApiKey` are reserved for the later Gemini implementation.
 
 ## Explicit migrations
 
@@ -64,6 +73,7 @@ curl -i -X PATCH http://localhost:5050/api/tickets/1/status \
   -H 'Content-Type: application/json' -d '{"status":"Closed"}'
 curl -i -X PATCH http://localhost:5050/api/tickets/1/status \
   -H 'Content-Type: application/json' -d '{"status":"Open"}'
+curl -i -X POST http://localhost:5050/api/tickets/1/analyze
 ```
 
 Creation returns HTTP 201, a Location header for the new Ticket, and the Ticket
@@ -82,17 +92,18 @@ values when deserializing typed enum contracts.
 
 ## MCP stdio
 
-In a terminal with the same database environment variable:
+In a terminal with the same database and provider environment variables:
 
 ```bash
 dotnet run --project src/SupportDesk.Mcp --no-build
 ```
 
 The host waits for an MCP client over stdin/stdout. Logs go to stderr. It exposes
-six tools at this stage: `create_ticket(title, description)`,
+seven tools at this stage: `create_ticket(title, description)`,
 `get_ticket(id)`, `list_tickets()`, `get_dashboard_summary()`,
 `update_ticket(id, title, description, priority)`, and
-`update_ticket_status(id, status)`, with typed inputs, output schemas, and structured results.
+`update_ticket_status(id, status)`, and `analyze_ticket(id)`, with typed inputs,
+output schemas, and structured results.
 Validation and unknown-ID failures set `isError: true` with controlled messages.
 All tools use the same Core service and database as REST.
 
@@ -105,7 +116,8 @@ Example client configuration (replace both absolute paths for your checkout):
       "command": "dotnet",
       "args": ["/absolute/path/to/SupportDesk/src/SupportDesk.Mcp/bin/Debug/net10.0/SupportDesk.Mcp.dll"],
       "env": {
-        "ConnectionStrings__SupportDesk": "Data Source=/absolute/path/to/SupportDesk/supportdesk.db"
+        "ConnectionStrings__SupportDesk": "Data Source=/absolute/path/to/SupportDesk/supportdesk.db",
+        "AI__Provider": "Mock"
       }
     }
   }
@@ -133,17 +145,42 @@ Edit or reopen the Ticket with:
 {"name":"update_ticket","arguments":{"id":1,"title":"Edited demo","description":"Synthetic update","priority":"Critical"}}
 {"name":"update_ticket_status","arguments":{"id":1,"status":"Closed"}}
 {"name":"update_ticket_status","arguments":{"id":1,"status":"Open"}}
+{"name":"analyze_ticket","arguments":{"id":1}}
 ```
 
-PUT/update_ticket require Title, Description, and Priority; they leave Status and
-Analysis fields unchanged. Status changes require Open, InProgress, Resolved, or
+PUT/update_ticket require Title, Description, and Priority; they leave Status
+unchanged. Changes to trimmed Title or Description clear Category, Sentiment,
+AiSummary, and SuggestedAction while preserving the submitted Priority.
+Priority-only edits and text unchanged after trimming preserve saved Analysis. Status changes require Open, InProgress, Resolved, or
 Closed and work from every current status. Resolved and Closed Tickets remain
 editable. Every successful update, including identical inputs or repeated status,
 refreshes UpdatedAt; CreatedAt is preserved. Missing, numeric (including numeric
 strings), and unknown Priority/Status inputs are rejected. Failed operations leave
 saved data unchanged. Successful writes return the updated Ticket (HTTP 200);
-unknown IDs return HTTP 404 or controlled MCP errors. Analysis-clearing rules
-are deferred to ticket 05.
+unknown IDs return HTTP 404 or controlled MCP errors.
+
+Analysis returns Category, Priority, Sentiment, Summary, and SuggestedAction as a
+typed response (HTTP 200 or MCP structuredContent). For example, Mock returns:
+
+```json
+{"category":"Other","priority":"Medium","sentiment":"Neutral","summary":"Mock Analysis: synthetic demonstration summary.","suggestedAction":"Mock suggestion: review the Ticket and contact the customer manually."}
+```
+
+Core validates all suggestions before saving: named enum values must be valid,
+Summary and SuggestedAction must be nonblank after trimming, with maximum lengths
+of 1,000 and 2,000 characters. Numeric and unknown enum JSON values are rejected.
+Only the latest valid Analysis is saved. It replaces Category and Priority,
+including manually chosen Priority, and stores Sentiment, AiSummary, and
+SuggestedAction. Every successful Analysis refreshes UpdatedAt, including repeated
+identical results. Resolved and Closed Tickets remain eligible.
+
+Unknown IDs return 404; provider failure or malformed results return safe 502
+ProblemDetails; typed provider timeouts return 504. MCP returns controlled errors.
+Failures preserve saved data and timestamps. To check a real provider error in
+this mock slice, restart a host with `AI__Provider` unset and request Analysis;
+it returns 502/an MCP error while get/list/update remain available. Mock itself
+always returns valid suggestions. Malformed output and timeout scenarios are
+covered through substituted IAiTicketService behavior in the Core tests.
 
 Check a blank title and ID `2147483647` to see controlled errors. Retrieve the
 created ID through REST, then restart both hosts and retrieve it again.

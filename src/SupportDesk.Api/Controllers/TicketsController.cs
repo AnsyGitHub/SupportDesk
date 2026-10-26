@@ -21,6 +21,14 @@ public class TicketsController(TicketService tickets) : ControllerBase
     public async Task<IReadOnlyList<TicketResponse>> ListAsync(CancellationToken cancellationToken) =>
         await tickets.ListAsync(cancellationToken);
 
+    [HttpPost("{id:int}/analyze")]
+    [ProducesResponseType<TicketAnalysisResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status504GatewayTimeout)]
+    public async Task<TicketAnalysisResponse> AnalyzeAsync(int id, CancellationToken cancellationToken) =>
+        await tickets.AnalyzeAsync(id, cancellationToken);
+
     [HttpPut("{id:int}")]
     [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

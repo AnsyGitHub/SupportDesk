@@ -10,6 +10,8 @@ public class ApiExceptionHandler : IExceptionHandler
     {
         var (status, title, detail) = exception switch
         {
+            AiProviderException { IsTimeout: true } => (504, "AI provider timeout", "The AI provider timed out."),
+            AiProviderException => (502, "AI provider failed", "The AI provider is unavailable or returned invalid Analysis."),
             ValidationException => (400, "Validation failed", exception.Message),
             NotFoundException => (404, "Ticket not found", exception.Message),
             _ => (500, "An unexpected error occurred", "The request could not be completed.")

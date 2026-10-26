@@ -10,7 +10,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Standard output is reserved for MCP protocol messages.
 builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
-builder.Services.AddSupportDesk(builder.Configuration.GetConnectionString("SupportDesk"));
+builder.Services.AddSupportDesk(builder.Configuration.GetConnectionString("SupportDesk"), builder.Configuration["AI:Provider"]);
 builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<Tools>(new JsonSerializerOptions(JsonSerializerOptions.Web));
 
 await builder.Build().RunAsync();

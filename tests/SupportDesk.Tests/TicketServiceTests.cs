@@ -42,7 +42,8 @@ public class TicketServiceTests : IAsyncLifetime
             var before = await service.GetAsync(1);
             updated = await service.UpdateAsync(1, new(" changed ", " changed description ", TicketPriority.High));
             Assert.Equal(before with { Title = "changed", Description = "changed description",
-                Priority = TicketPriority.High, UpdatedAt = updated.UpdatedAt }, updated);
+                Priority = TicketPriority.High, Category = null, Sentiment = null, AiSummary = null,
+                SuggestedAction = null, UpdatedAt = updated.UpdatedAt }, updated);
             Assert.True(updated.UpdatedAt > timestamp);
             var repeated = await service.UpdateAsync(1, new(updated.Title, updated.Description, updated.Priority));
             Assert.Equal(updated with { UpdatedAt = repeated.UpdatedAt }, repeated);

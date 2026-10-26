@@ -18,7 +18,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
-builder.Services.AddSupportDesk(builder.Configuration.GetConnectionString("SupportDesk"));
+builder.Services.AddSupportDesk(builder.Configuration.GetConnectionString("SupportDesk"), builder.Configuration["AI:Provider"]);
 
 var app = builder.Build();
 

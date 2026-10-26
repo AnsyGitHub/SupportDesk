@@ -4,7 +4,7 @@ using SupportDesk.Core.Errors;
 
 namespace SupportDesk.Core.Tickets;
 
-public class TicketService(SupportDeskDbContext db)
+public class TicketService(SupportDeskDbContext db, IAiTicketService? ai = null)
 {
     public async Task<TicketResponse> CreateAsync(CreateTicketRequest request, CancellationToken cancellationToken = default)
     {
@@ -66,6 +66,14 @@ public class TicketService(SupportDeskDbContext db)
 
         var ticket = await db.Tickets.SingleOrDefaultAsync(ticket => ticket.Id == id, cancellationToken)
             ?? throw new NotFoundException($"Ticket {id} was not found.");
+        if (ticket.Title != title || ticket.Description != description)
+        {
+            ticket.Category = null;
+            ticket.Sentiment = null;
+            ticket.AiSummary = null;
+            ticket.SuggestedAction = null;
+        }
+
         ticket.Title = title;
         ticket.Description = description;
         ticket.Priority = priority;
@@ -87,6 +95,37 @@ public class TicketService(SupportDeskDbContext db)
         ticket.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return ToResponse(ticket);
+    }
+
+    public async Task<TicketAnalysisResponse> AnalyzeAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var ticket = await db.Tickets.SingleOrDefaultAsync(ticket => ticket.Id == id, cancellationToken)
+            ?? throw new NotFoundException($"Ticket {id} was not found.");
+        if (ai is null)
+        {
+            throw new AiProviderException();
+        }
+
+        var analysis = await ai.AnalyzeAsync(ticket.Title, ticket.Description, cancellationToken);
+        var summary = analysis?.Summary?.Trim();
+        var suggestedAction = analysis?.SuggestedAction?.Trim();
+        if (analysis?.Category is not { } category || !Enum.IsDefined(category)
+            || analysis.Priority is not { } priority || !Enum.IsDefined(priority)
+            || analysis.Sentiment is not { } sentiment || !Enum.IsDefined(sentiment)
+            || string.IsNullOrEmpty(summary) || summary.Length > 1000
+            || string.IsNullOrEmpty(suggestedAction) || suggestedAction.Length > 2000)
+        {
+            throw new AiProviderException();
+        }
+
+        ticket.Category = category;
+        ticket.Priority = priority;
+        ticket.Sentiment = sentiment;
+        ticket.AiSummary = summary;
+        ticket.SuggestedAction = suggestedAction;
+        ticket.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return new TicketAnalysisResponse(category, priority, sentiment, summary, suggestedAction);
     }
 
     private static string ValidateText(string? value, string field, int maxLength)
