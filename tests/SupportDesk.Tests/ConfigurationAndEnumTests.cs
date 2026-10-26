@@ -25,6 +25,17 @@ public class ConfigurationAndEnumTests
         }
     }
 
+    [Theory]
+    [InlineData("Gemini", typeof(GeminiAiTicketService))]
+    [InlineData("Mock", typeof(MockAiTicketService))]
+    public void ExplicitProviderSelectionResolvesRequestedService(string provider, Type expected)
+    {
+        using var services = new ServiceCollection()
+            .AddSupportDesk("Data Source=/tmp/tickets.db", provider, "test-model", "synthetic-key")
+            .BuildServiceProvider();
+        Assert.IsType(expected, services.GetRequiredService<IAiTicketService>());
+    }
+
     [Fact]
     public void EnumContractsUseNamesAndRejectUnknownAndNumericValues()
     {

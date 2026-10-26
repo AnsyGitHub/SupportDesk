@@ -3,7 +3,7 @@
 A .NET 10 support-ticket application with a controller API and a separate stdio
 MCP host over the same Core service and SQLite database. Currently implemented:
 create, retrieve, list, and update Tickets, status changes, and dashboard counts.
-Analysis and Draft Replies use explicitly selected mock AI. Gemini is pending.
+Analysis and Draft Replies support explicitly selected Mock or Gemini providers.
 No AI credentials are needed for the mock demonstration.
 
 ## Prerequisites and setup
@@ -35,7 +35,33 @@ Its Summary, SuggestedAction, and Draft Reply text explicitly say Mock; it does 
 provider and does not infer real suggestions from Ticket text. Missing or
 unsupported provider selection disables AI operations with a controlled provider error;
 ordinary Ticket operations still work. There is no automatic fallback to Mock.
-`AI__Model` and `AI__ApiKey` are reserved for the later Gemini implementation.
+For Gemini, set these in each terminal before starting the API or MCP host:
+
+```bash
+export AI__Provider=Gemini
+export AI__Model=your-structured-output-model
+read -rsp 'Gemini API key: ' AI__ApiKey; echo
+export AI__ApiKey
+```
+
+Choose an available model supporting GenerateContent structured JSON output.
+The model name is the bare ID without `models/`. Both hosts read `AI:Provider`,
+`AI:Model`, and `AI:ApiKey` from .NET configuration (`__` in environment variables).
+For an MCP client that launches the server, supply these same variables in the
+client's private `env` configuration; the launched process may not inherit your
+terminal environment. Keep its key outside this repository. Empty model/key
+configuration produces controlled AI failures while Ticket operations still work.
+
+Gemini uses plain HttpClient with a 30-second deadline covering the request and
+response body, no automatic retries, no redirects, and no fallback. The key is
+sent in the `x-goog-api-key` header. Structured JSON is parsed into typed output,
+then the shared Core validation runs before returning or saving results.
+Timeouts return REST 504, provider/malformed-output failures return 502, and MCP
+returns controlled tool errors. Caller cancellation stays cancellation. Analysis
+failures preserve stored data; Draft Replies are never saved or sent.
+Use only synthetic Ticket text when Gemini is selected. Calls may incur provider
+charges. See Google's [GenerateContent reference](https://ai.google.dev/api/generate-content)
+and [structured output guide](https://ai.google.dev/gemini-api/docs/generate-content/structured-output).
 
 ## Explicit migrations
 
