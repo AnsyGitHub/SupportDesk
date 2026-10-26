@@ -86,6 +86,20 @@ public class Tools(TicketService tickets)
         }
     }
 
+    [McpServerTool(Name = "draft_reply", UseStructuredContent = true, ReadOnly = true)]
+    [Description("Generate a Draft Reply from current Ticket text for human review without requiring Analysis. Never saves or sends it. Works for Resolved and Closed Tickets. AI__Provider=Mock returns labeled mock output.")]
+    public async Task<TicketDraftReplyResponse> DraftReplyAsync(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await tickets.DraftReplyAsync(id, cancellationToken);
+        }
+        catch (Exception exception) when (exception is NotFoundException or AiProviderException)
+        {
+            throw new McpException(exception.Message);
+        }
+    }
+
     [McpServerTool(Name = "get_ticket", UseStructuredContent = true, ReadOnly = true)]
     [Description("Retrieve a Ticket by its integer ID. Returns an error if it does not exist.")]
     public async Task<TicketResponse> GetTicketAsync(int id, CancellationToken cancellationToken)

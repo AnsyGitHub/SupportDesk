@@ -128,6 +128,23 @@ public class TicketService(SupportDeskDbContext db, IAiTicketService? ai = null)
         return new TicketAnalysisResponse(category, priority, sentiment, summary, suggestedAction);
     }
 
+    public async Task<TicketDraftReplyResponse> DraftReplyAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var ticket = await GetAsync(id, cancellationToken);
+        if (ai is null)
+        {
+            throw new AiProviderException();
+        }
+
+        var text = (await ai.DraftReplyAsync(ticket.Title, ticket.Description, cancellationToken))?.Trim();
+        if (string.IsNullOrEmpty(text) || text.Length > 4000)
+        {
+            throw new AiProviderException();
+        }
+
+        return new TicketDraftReplyResponse(text);
+    }
+
     private static string ValidateText(string? value, string field, int maxLength)
     {
         var text = value?.Trim();

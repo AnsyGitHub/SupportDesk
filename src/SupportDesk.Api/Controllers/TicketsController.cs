@@ -29,6 +29,14 @@ public class TicketsController(TicketService tickets) : ControllerBase
     public async Task<TicketAnalysisResponse> AnalyzeAsync(int id, CancellationToken cancellationToken) =>
         await tickets.AnalyzeAsync(id, cancellationToken);
 
+    [HttpPost("{id:int}/draft-reply")]
+    [ProducesResponseType<TicketDraftReplyResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status504GatewayTimeout)]
+    public async Task<TicketDraftReplyResponse> DraftReplyAsync(int id, CancellationToken cancellationToken) =>
+        await tickets.DraftReplyAsync(id, cancellationToken);
+
     [HttpPut("{id:int}")]
     [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]

@@ -3,7 +3,7 @@
 A .NET 10 support-ticket application with a controller API and a separate stdio
 MCP host over the same Core service and SQLite database. Currently implemented:
 create, retrieve, list, and update Tickets, status changes, and dashboard counts.
-Analysis uses explicitly selected mock AI. Gemini and Draft Replies are pending.
+Analysis and Draft Replies use explicitly selected mock AI. Gemini is pending.
 No AI credentials are needed for the mock demonstration.
 
 ## Prerequisites and setup
@@ -31,9 +31,9 @@ The hosts reject missing or relative database paths and in-memory databases.
 files. Database files and local `.env` files are ignored by Git.
 
 Set `AI__Provider=Mock` for each host to enable the deterministic mock provider.
-Its Summary and SuggestedAction explicitly say Mock; it does not contact an AI
+Its Summary, SuggestedAction, and Draft Reply text explicitly say Mock; it does not contact an AI
 provider and does not infer real suggestions from Ticket text. Missing or
-unsupported provider selection disables Analysis with a controlled provider error;
+unsupported provider selection disables AI operations with a controlled provider error;
 ordinary Ticket operations still work. There is no automatic fallback to Mock.
 `AI__Model` and `AI__ApiKey` are reserved for the later Gemini implementation.
 
@@ -74,6 +74,7 @@ curl -i -X PATCH http://localhost:5050/api/tickets/1/status \
 curl -i -X PATCH http://localhost:5050/api/tickets/1/status \
   -H 'Content-Type: application/json' -d '{"status":"Open"}'
 curl -i -X POST http://localhost:5050/api/tickets/1/analyze
+curl -i -X POST http://localhost:5050/api/tickets/1/draft-reply
 ```
 
 Creation returns HTTP 201, a Location header for the new Ticket, and the Ticket
@@ -99,10 +100,10 @@ dotnet run --project src/SupportDesk.Mcp --no-build
 ```
 
 The host waits for an MCP client over stdin/stdout. Logs go to stderr. It exposes
-seven tools at this stage: `create_ticket(title, description)`,
+eight tools: `create_ticket(title, description)`,
 `get_ticket(id)`, `list_tickets()`, `get_dashboard_summary()`,
 `update_ticket(id, title, description, priority)`, and
-`update_ticket_status(id, status)`, and `analyze_ticket(id)`, with typed inputs,
+`update_ticket_status(id, status)`, `analyze_ticket(id)`, and `draft_reply(id)`, with typed inputs,
 output schemas, and structured results.
 Validation and unknown-ID failures set `isError: true` with controlled messages.
 All tools use the same Core service and database as REST.
@@ -146,6 +147,7 @@ Edit or reopen the Ticket with:
 {"name":"update_ticket_status","arguments":{"id":1,"status":"Closed"}}
 {"name":"update_ticket_status","arguments":{"id":1,"status":"Open"}}
 {"name":"analyze_ticket","arguments":{"id":1}}
+{"name":"draft_reply","arguments":{"id":1}}
 ```
 
 PUT/update_ticket require Title, Description, and Priority; they leave Status
@@ -182,6 +184,27 @@ it returns 502/an MCP error while get/list/update remain available. Mock itself
 always returns valid suggestions. Malformed output and timeout scenarios are
 covered through substituted IAiTicketService behavior in the Core tests.
 
+Draft Replies use the current Title and Description and do not require Analysis.
+REST `POST /api/tickets/{id}/draft-reply` returns HTTP 200 with the same structured
+result as MCP `draft_reply(id)`. For a Ticket titled `Unable to sign in`, Mock returns:
+
+```json
+{"text":"Mock Draft Reply: Thank you for contacting support about \"Unable to sign in\". We have received your request and will review the details. Please review and edit this draft before sending it manually."}
+```
+
+This is synthetic demonstration text for human review. Before using a response,
+the support agent should edit it to reflect verified facts and the intended next
+step; for example, replace the generic acknowledgement with an approved account
+recovery instruction after checking the request. The application never sends a
+reply. Mock mentions the Title and receives both current text fields but does not
+infer a solution from the Description.
+
+Core trims the reply and rejects missing, blank, or over-4,000-character output.
+Resolved and Closed Tickets are eligible. Drafts are never stored, added to
+history, or used to change Ticket fields or UpdatedAt, including on failures.
+Unknown IDs return 404 or a controlled MCP error. Provider failure and malformed
+output use 502; typed timeouts use 504; MCP reports controlled tool errors.
+
 Check a blank title and ID `2147483647` to see controlled errors. Retrieve the
 created ID through REST, then restart both hosts and retrieve it again.
 
@@ -199,8 +222,17 @@ and retrieve a REST-created Ticket through MCP to confirm shared data. Restart
 both hosts with the same database path and retrieve the Ticket again to check
 persistence. Check blank input and an unknown ID for controlled errors.
 
+For AI operations, explicitly select Mock or configure Gemini in both hosts.
+Mock results are synthetic. Analyze a Ticket, retrieve its saved suggestions,
+then generate a Draft Reply and confirm the saved Ticket and UpdatedAt are
+unchanged. Capture representative REST responses and MCP tool results for the
+assessment. Automated provider tests simulate the external HTTP boundary and
+are not evidence of live Gemini access.
+
 ## Known limitations
 
 This is a local assessment application. Filters, pagination, delete operations,
 authentication, remote MCP hosting, and a frontend are not implemented. SQLite
 is a shared local file. Use the same absolute path for both hosts.
+AI output requires human review; Draft Replies are never sent or stored.
+Provider availability is external to the application.
