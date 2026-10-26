@@ -1,9 +1,28 @@
+using Microsoft.AspNetCore.Mvc;
+using SupportDesk.Api.Errors;
+using SupportDesk.Core.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.SuppressAsyncSuffixInActionNames = false);
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    // Framework binding errors can include raw JSON and internal type names.
+    options.InvalidModelStateResponseFactory = _ => new BadRequestObjectResult(new ProblemDetails
+    {
+        Status = StatusCodes.Status400BadRequest,
+        Title = "Invalid request",
+        Detail = "Provide a JSON object with title and description strings, and an integer ticket ID where required."
+    });
+});
 builder.Services.AddSwaggerGen();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddSupportDesk(builder.Configuration.GetConnectionString("SupportDesk"));
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
