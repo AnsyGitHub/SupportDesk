@@ -2,8 +2,8 @@
 
 A .NET 10 support-ticket application with a controller API and a separate stdio
 MCP host over the same Core service and SQLite database. Currently implemented:
-create, retrieve, and list Tickets, plus dashboard counts. Later tickets add
-updates and AI operations. No AI credentials are needed for the current operations.
+create, retrieve, list, and update Tickets, status changes, and dashboard counts.
+Later tickets add AI operations. No AI credentials are needed for the current operations.
 
 ## Prerequisites and setup
 
@@ -57,6 +57,13 @@ curl -i http://localhost:5050/api/tickets \
 curl -i http://localhost:5050/api/tickets/1
 curl -i http://localhost:5050/api/tickets
 curl -i http://localhost:5050/api/dashboard/summary
+curl -i -X PUT http://localhost:5050/api/tickets/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Unable to sign in","description":"Synthetic demo: still blocked.","priority":"High"}'
+curl -i -X PATCH http://localhost:5050/api/tickets/1/status \
+  -H 'Content-Type: application/json' -d '{"status":"Closed"}'
+curl -i -X PATCH http://localhost:5050/api/tickets/1/status \
+  -H 'Content-Type: application/json' -d '{"status":"Open"}'
 ```
 
 Creation returns HTTP 201, a Location header for the new Ticket, and the Ticket
@@ -82,8 +89,10 @@ dotnet run --project src/SupportDesk.Mcp --no-build
 ```
 
 The host waits for an MCP client over stdin/stdout. Logs go to stderr. It exposes
-four tools at this stage: `create_ticket(title, description)`,
-`get_ticket(id)`, `list_tickets()`, and `get_dashboard_summary()`, with typed inputs, output schemas, and structured Ticket results.
+six tools at this stage: `create_ticket(title, description)`,
+`get_ticket(id)`, `list_tickets()`, `get_dashboard_summary()`,
+`update_ticket(id, title, description, priority)`, and
+`update_ticket_status(id, status)`, with typed inputs, output schemas, and structured results.
 Validation and unknown-ID failures set `isError: true` with controlled messages.
 All tools use the same Core service and database as REST.
 
@@ -117,6 +126,24 @@ Use the returned `structuredContent.id` for:
 ```json
 {"name":"get_ticket","arguments":{"id":1}}
 ```
+
+Edit or reopen the Ticket with:
+
+```json
+{"name":"update_ticket","arguments":{"id":1,"title":"Edited demo","description":"Synthetic update","priority":"Critical"}}
+{"name":"update_ticket_status","arguments":{"id":1,"status":"Closed"}}
+{"name":"update_ticket_status","arguments":{"id":1,"status":"Open"}}
+```
+
+PUT/update_ticket require Title, Description, and Priority; they leave Status and
+Analysis fields unchanged. Status changes require Open, InProgress, Resolved, or
+Closed and work from every current status. Resolved and Closed Tickets remain
+editable. Every successful update, including identical inputs or repeated status,
+refreshes UpdatedAt; CreatedAt is preserved. Missing, numeric (including numeric
+strings), and unknown Priority/Status inputs are rejected. Failed operations leave
+saved data unchanged. Successful writes return the updated Ticket (HTTP 200);
+unknown IDs return HTTP 404 or controlled MCP errors. Analysis-clearing rules
+are deferred to ticket 05.
 
 Check a blank title and ID `2147483647` to see controlled errors. Retrieve the
 created ID through REST, then restart both hosts and retrieve it again.

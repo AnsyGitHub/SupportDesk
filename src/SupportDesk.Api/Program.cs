@@ -12,7 +12,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     {
         Status = StatusCodes.Status400BadRequest,
         Title = "Invalid request",
-        Detail = "Provide a JSON object with title and description strings, and an integer ticket ID where required."
+        Detail = "Provide the required JSON fields with text strings, named priority/status values, and an integer ticket ID where required."
     });
 });
 builder.Services.AddSwaggerGen();

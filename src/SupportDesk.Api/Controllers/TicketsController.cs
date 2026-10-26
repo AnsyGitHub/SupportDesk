@@ -21,6 +21,20 @@ public class TicketsController(TicketService tickets) : ControllerBase
     public async Task<IReadOnlyList<TicketResponse>> ListAsync(CancellationToken cancellationToken) =>
         await tickets.ListAsync(cancellationToken);
 
+    [HttpPut("{id:int}")]
+    [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<TicketResponse> UpdateAsync(int id, UpdateTicketRequest request, CancellationToken cancellationToken) =>
+        await tickets.UpdateAsync(id, request, cancellationToken);
+
+    [HttpPatch("{id:int}/status")]
+    [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<TicketResponse> UpdateStatusAsync(int id, UpdateTicketStatusRequest request, CancellationToken cancellationToken) =>
+        await tickets.UpdateStatusAsync(id, request, cancellationToken);
+
     [HttpGet("{id:int}")]
     [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

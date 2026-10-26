@@ -55,6 +55,40 @@ public class TicketService(SupportDeskDbContext db)
         return summary ?? new DashboardSummaryResponse(0, 0, 0, 0);
     }
 
+    public async Task<TicketResponse> UpdateAsync(int id, UpdateTicketRequest request, CancellationToken cancellationToken = default)
+    {
+        var title = ValidateText(request.Title, "Title", 200);
+        var description = ValidateText(request.Description, "Description", 5000);
+        if (request.Priority is not { } priority || !Enum.IsDefined(priority))
+        {
+            throw new ValidationException("Priority must be Low, Medium, High, or Critical.");
+        }
+
+        var ticket = await db.Tickets.SingleOrDefaultAsync(ticket => ticket.Id == id, cancellationToken)
+            ?? throw new NotFoundException($"Ticket {id} was not found.");
+        ticket.Title = title;
+        ticket.Description = description;
+        ticket.Priority = priority;
+        ticket.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return ToResponse(ticket);
+    }
+
+    public async Task<TicketResponse> UpdateStatusAsync(int id, UpdateTicketStatusRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Status is not { } status || !Enum.IsDefined(status))
+        {
+            throw new ValidationException("Status must be Open, InProgress, Resolved, or Closed.");
+        }
+
+        var ticket = await db.Tickets.SingleOrDefaultAsync(ticket => ticket.Id == id, cancellationToken)
+            ?? throw new NotFoundException($"Ticket {id} was not found.");
+        ticket.Status = status;
+        ticket.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return ToResponse(ticket);
+    }
+
     private static string ValidateText(string? value, string field, int maxLength)
     {
         var text = value?.Trim();
