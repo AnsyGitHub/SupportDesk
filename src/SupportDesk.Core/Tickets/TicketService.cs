@@ -34,6 +34,27 @@ public class TicketService(SupportDeskDbContext db)
         return ToResponse(ticket);
     }
 
+    public async Task<IReadOnlyList<TicketResponse>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        var tickets = await db.Tickets.AsNoTracking()
+            .OrderByDescending(ticket => ticket.CreatedAt)
+            .ThenByDescending(ticket => ticket.Id)
+            .ToListAsync(cancellationToken);
+        return tickets.Select(ToResponse).ToList();
+    }
+
+    public async Task<DashboardSummaryResponse> GetDashboardSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var summary = await db.Tickets.AsNoTracking().GroupBy(ticket => 1)
+            .Select(group => new DashboardSummaryResponse(
+                group.Count(),
+                group.Count(ticket => ticket.Status == TicketStatus.Open),
+                group.Count(ticket => ticket.Priority == TicketPriority.High || ticket.Priority == TicketPriority.Critical),
+                group.Count(ticket => ticket.Status == TicketStatus.Resolved)))
+            .SingleOrDefaultAsync(cancellationToken);
+        return summary ?? new DashboardSummaryResponse(0, 0, 0, 0);
+    }
+
     private static string ValidateText(string? value, string field, int maxLength)
     {
         var text = value?.Trim();

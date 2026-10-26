@@ -22,6 +22,74 @@ public class TicketServiceTests : IAsyncLifetime
     public async Task DisposeAsync() => await connection.DisposeAsync();
 
     [Fact]
+    public async Task DashboardCountsOverlappingPrioritiesAcrossAllStatusesWithoutWritingAsync()
+    {
+        var timestamp = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await using (var db = new SupportDeskDbContext(options))
+        {
+            foreach (var (status, priority) in new[]
+            {
+                (TicketStatus.Open, TicketPriority.High),
+                (TicketStatus.Open, TicketPriority.Low),
+                (TicketStatus.InProgress, TicketPriority.Critical),
+                (TicketStatus.Resolved, TicketPriority.High),
+                (TicketStatus.Resolved, TicketPriority.Medium),
+                (TicketStatus.Closed, TicketPriority.Critical)
+            })
+            {
+                db.Tickets.Add(new Ticket { Title = "t", Description = "d", Status = status,
+                    Priority = priority, CreatedAt = timestamp, UpdatedAt = timestamp });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        await using var freshDb = new SupportDeskDbContext(options);
+        var service = new TicketService(freshDb);
+        Assert.Equal(new DashboardSummaryResponse(6, 2, 4, 2), await service.GetDashboardSummaryAsync());
+        Assert.All(await service.ListAsync(), ticket => Assert.Equal(timestamp, ticket.UpdatedAt));
+    }
+
+    [Fact]
+    public async Task ListOrdersNewestFirstThenHighestIdAndLeavesTimestampsUnchangedAsync()
+    {
+        var older = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var newer = older.AddDays(1);
+        await using (var db = new SupportDeskDbContext(options))
+        {
+            db.Tickets.AddRange(
+                new Ticket { Id = 10, Title = "Old", Description = "d", CreatedAt = older, UpdatedAt = older },
+                new Ticket { Id = 2, Title = "New low ID", Description = "d", CreatedAt = newer, UpdatedAt = older },
+                new Ticket { Id = 3, Title = "New high ID", Description = "d", CreatedAt = newer, UpdatedAt = older });
+            await db.SaveChangesAsync();
+        }
+
+        await using var freshDb = new SupportDeskDbContext(options);
+        var service = new TicketService(freshDb);
+        var listed = await service.ListAsync();
+        Assert.Equal(new[] { 3, 2, 10 }, listed.Select(ticket => ticket.Id));
+        foreach (var ticket in listed)
+        {
+            Assert.Equal(older, ticket.UpdatedAt);
+            Assert.Equal(ticket, await service.GetAsync(ticket.Id));
+        }
+    }
+
+    [Fact]
+    public async Task DashboardReturnsZeroCountsForEmptyDatabaseAsync()
+    {
+        await using var db = new SupportDeskDbContext(options);
+        var summary = await new TicketService(db).GetDashboardSummaryAsync();
+        Assert.Equal(new DashboardSummaryResponse(0, 0, 0, 0), summary);
+    }
+
+    [Fact]
+    public async Task ListReturnsEmptyWhenNoTicketsExistAsync()
+    {
+        await using var db = new SupportDeskDbContext(options);
+        Assert.Empty(await new TicketService(db).ListAsync());
+    }
+
+    [Fact]
     public async Task CreateTrimsTextAndPersistsDefaultsAcrossContextsAsync()
     {
         var before = DateTime.UtcNow;

@@ -2,8 +2,8 @@
 
 A .NET 10 support-ticket application with a controller API and a separate stdio
 MCP host over the same Core service and SQLite database. Currently implemented:
-create and retrieve Tickets. Later tickets add listing, updates, AI, and dashboard
-operations. No AI credentials are needed for the current operations.
+create, retrieve, and list Tickets, plus dashboard counts. Later tickets add
+updates and AI operations. No AI credentials are needed for the current operations.
 
 ## Prerequisites and setup
 
@@ -55,6 +55,8 @@ curl -i http://localhost:5050/api/tickets \
   -H 'Content-Type: application/json' \
   -d '{"title":"Unable to sign in","description":"Synthetic demo: password reset did not help."}'
 curl -i http://localhost:5050/api/tickets/1
+curl -i http://localhost:5050/api/tickets
+curl -i http://localhost:5050/api/dashboard/summary
 ```
 
 Creation returns HTTP 201, a Location header for the new Ticket, and the Ticket
@@ -80,10 +82,10 @@ dotnet run --project src/SupportDesk.Mcp --no-build
 ```
 
 The host waits for an MCP client over stdin/stdout. Logs go to stderr. It exposes
-exactly two tools at this stage, `create_ticket(title, description)` and
-`get_ticket(id)`, with typed inputs, output schemas, and structured Ticket results.
+four tools at this stage: `create_ticket(title, description)`,
+`get_ticket(id)`, `list_tickets()`, and `get_dashboard_summary()`, with typed inputs, output schemas, and structured Ticket results.
 Validation and unknown-ID failures set `isError: true` with controlled messages.
-Both tools use the same Core service and database as REST.
+All tools use the same Core service and database as REST.
 
 Example client configuration (replace both absolute paths for your checkout):
 

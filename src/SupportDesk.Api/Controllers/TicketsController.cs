@@ -16,6 +16,11 @@ public class TicketsController(TicketService tickets) : ControllerBase
         return CreatedAtAction(nameof(GetAsync), new { id = ticket.Id }, ticket);
     }
 
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<TicketResponse>>(StatusCodes.Status200OK)]
+    public async Task<IReadOnlyList<TicketResponse>> ListAsync(CancellationToken cancellationToken) =>
+        await tickets.ListAsync(cancellationToken);
+
     [HttpGet("{id:int}")]
     [ProducesResponseType<TicketResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
